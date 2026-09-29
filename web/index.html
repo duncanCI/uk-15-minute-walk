@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How far is daily life? A 15-minute walk map of the UK</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link id="mlcss" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+<script id="mljs" src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<style>
+:root{
+  --paper:#f4f6f6; --ink:#1d2327; --muted:#5b666d; --rule:#cfd6d9; --accent:#d4561a; --accent-ink:#fff;
+  --bar:#4b7c95; --track:#dde3e5; --shadow:0 6px 24px rgba(10,20,25,.28);
+  --font:"Schibsted Grotesk","Helvetica Neue",Arial,sans-serif;
+  box-sizing:border-box;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#1b2125; --ink:#e6e9ea; --muted:#9aa5ab; --rule:#323b40; --accent:#f07a3a; --accent-ink:#171c1f;
+  --bar:#6fa7be; --track:#2c353a;}}
+:root[data-theme="dark"]{--paper:#1b2125; --ink:#e6e9ea; --muted:#9aa5ab; --rule:#323b40; --accent:#f07a3a;
+  --accent-ink:#171c1f; --bar:#6fa7be; --track:#2c353a;}
+*,*::before,*::after{box-sizing:inherit}
+html,body{height:100%;margin:0}
+body{background:#0c1114;color:var(--ink);font:400 15px/1.45 var(--font);font-variant-numeric:tabular-nums}
+#map{position:fixed;inset:0}
+.panel{position:fixed;left:16px;top:calc(16px + env(safe-area-inset-top,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));
+  width:392px;background:var(--paper);border-radius:10px;box-shadow:var(--shadow);overflow-y:auto;padding:24px 24px 18px;z-index:2}
+h1{font-size:28px;line-height:1.13;font-weight:800;letter-spacing:-.02em;margin:0 0 8px}
+.sub{color:var(--muted);font-size:13px;margin:0 0 18px;min-height:1em}
+.search{position:relative;margin-bottom:18px}
+.search input{width:100%;font:400 15px var(--font);padding:10px 12px;border:1.5px solid var(--rule);border-radius:8px;
+  background:var(--paper);color:var(--ink)}
+.search input:focus-visible{outline:3px solid var(--accent);outline-offset:1px;border-color:transparent}
+.results{position:absolute;left:0;right:0;top:100%;margin:4px 0 0;padding:4px;list-style:none;background:var(--paper);
+  border:1px solid var(--rule);border-radius:8px;box-shadow:var(--shadow);z-index:3;display:none}
+.results li{padding:7px 9px;border-radius:6px;cursor:pointer;display:flex;justify-content:space-between;gap:10px}
+.results li small{color:var(--muted)}
+.results li[aria-selected=true]{background:color-mix(in srgb,var(--accent) 16%,transparent)}
+.ctl-label{font-weight:700;font-size:14px;margin:0 0 8px;display:block}
+.ctl-label span{font-weight:400;color:var(--muted)}
+input[type=range]{width:100%;accent-color:var(--accent);height:26px}
+.ticks{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-top:-2px}
+fieldset{border:0;padding:0;margin:16px 0 0}
+legend{font-weight:700;font-size:14px;padding:0;margin-bottom:8px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{position:relative}
+.chip input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.chip label{display:inline-flex;align-items:center;gap:8px;padding:6px 12px 6px 10px;border:1.5px solid var(--rule);
+  border-radius:20px;font-size:14px;cursor:pointer;user-select:none}
+.chip label::before{content:"";width:13px;height:13px;border-radius:3px;border:1.5px solid var(--muted)}
+.chip input:checked+label{border-color:var(--ink)}
+.chip input:checked+label::before{background:var(--ink);border-color:var(--ink);box-shadow:inset 0 0 0 2px var(--paper)}
+.chip input:focus-visible+label{outline:3px solid var(--accent);outline-offset:2px}
+.head2{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:22px 0 4px;border-top:1px solid var(--rule);padding-top:16px}
+.head2 h2{font-size:17px;margin:0}
+.btn{font:500 14px var(--font);border:1.5px solid var(--accent);color:var(--accent);background:transparent;border-radius:6px;
+  padding:5px 11px;cursor:pointer;white-space:nowrap}
+.btn[aria-pressed=true]{background:var(--accent);color:var(--accent-ink)}
+.btn:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.hint{color:var(--muted);font-size:13px;margin:0 0 8px}
+ol.rows{list-style:none;margin:0;padding:0}
+.row{display:grid;grid-template-columns:minmax(0,1fr) 44px 22px;align-items:center;gap:3px 8px;padding:7px 6px;border-radius:6px;cursor:pointer}
+.row:hover{background:color-mix(in srgb,var(--ink) 6%,transparent)}
+.row[aria-current=true]{background:color-mix(in srgb,var(--accent) 15%,transparent)}
+.row:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
+.row .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.row .nm small{color:var(--muted);font-weight:400}
+.row .v{text-align:right;font-weight:700}
+.row .bar{grid-column:1/3;height:5px;background:var(--track);border-radius:3px;overflow:hidden}
+.row .bar i{display:block;height:100%;background:var(--bar)}
+.row.pin .bar i{background:var(--accent)}
+.row .x{grid-row:1;grid-column:3;border:0;background:none;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;border-radius:4px}
+.row .x:focus-visible{outline:2px solid var(--accent)}
+.row.lead .nm{font-weight:700}
+details{margin-top:14px;border-top:1px solid var(--rule);padding-top:12px;font-size:14px}
+summary{font-weight:700;cursor:pointer}
+details p,details li{color:var(--muted);max-width:60ch}
+details ul{padding-left:18px}
+.filter{display:flex;gap:8px;margin:10px 0 6px}
+.filter select{font:400 14px var(--font);padding:5px 8px;border:1.5px solid var(--rule);border-radius:6px;background:var(--paper);color:var(--ink)}
+.credit{font-size:12px;color:var(--muted);margin-top:14px}
+.credit a{color:inherit}
+.legend{position:fixed;right:16px;bottom:calc(46px + env(safe-area-inset-bottom,0px));z-index:2;background:rgba(14,20,24,.78);color:#eef2f3;
+  border-radius:8px;padding:10px 12px;font-size:12px;width:210px;backdrop-filter:blur(4px)}
+.legend strong{display:block;font-size:13px;margin-bottom:6px;line-height:1.25}
+.legend .k{display:flex;align-items:center;gap:8px;margin:3px 0}
+.legend .k i{width:22px;height:4px;border-radius:2px;flex:none}
+.tip{position:fixed;z-index:4;pointer-events:none;background:var(--paper);border-radius:8px;box-shadow:var(--shadow);
+  padding:9px 11px;font-size:13px;width:240px;display:none}
+.tip h3{margin:0 0 4px;font-size:14px}
+.tip table{border-collapse:collapse;width:100%}.tip td{padding:1px 0}.tip td+td{text-align:right;white-space:nowrap}
+.tip .far{color:var(--muted)}
+.maplibregl-ctrl-attrib{font:400 11px var(--font)}
+@media (max-width:760px){
+  .panel{left:0;right:0;top:auto;bottom:0;width:auto;max-height:48vh;border-radius:14px 14px 0 0;padding:18px 16px calc(14px + env(safe-area-inset-bottom,0px))}
+  h1{font-size:22px}
+  .legend{top:calc(10px + env(safe-area-inset-top,0px));bottom:auto;right:10px;width:170px;padding:8px 10px}
+}
+</style>
+</head>
+<body>
+<div id="map" role="region" aria-label="Satellite map of residential streets coloured by how many daily needs are within the chosen walk"></div>
+<aside class="panel">
+  <h1 id="headline" aria-live="polite">Loading the map data</h1>
+  <p class="sub" id="sub"></p>
+  <div class="search">
+    <label class="ctl-label" for="q">Find a place or council</label>
+    <input id="q" type="search" autocomplete="off" placeholder="Try Partick, Cardiff or Newry" role="combobox" aria-expanded="false" aria-controls="res">
+    <ul class="results" id="res" role="listbox"></ul>
+  </div>
+  <label class="ctl-label" for="walk">Walk time <span id="walkv"></span></label>
+  <input id="walk" type="range" min="5" max="25" step="1" value="15">
+  <div class="ticks"><span>5 min</span><span>15 min</span><span>25 min</span></div>
+  <fieldset><legend>Needs that count</legend><div class="chips" id="chips"></div></fieldset>
+
+  <div class="head2"><h2>Compare</h2><button class="btn" id="addpin" aria-pressed="false">Add a place</button></div>
+  <p class="hint" id="hint"></p>
+  <ol class="rows" id="rows"></ol>
+
+  <details id="rank">
+    <summary id="ranksum">All councils, ranked</summary>
+    <div class="filter"><label for="nat" class="ctl-label" style="margin:0;align-self:center">Show</label>
+      <select id="nat"><option value="">All of the UK</option><option>England</option><option>Scotland</option><option>Wales</option><option>Northern Ireland</option></select></div>
+    <ol class="rows" id="ranked"></ol>
+  </details>
+
+  <details>
+    <summary>Read this before quoting a number</summary>
+    <p>The places come from OpenStreetMap. Where mapping is thin, a street can look cut off when it is not. When you pick a council, the line under the headline shows how many of each place the data holds there. Check any low figure against NHS or council lists.</p>
+    <ul>
+      <li>A food shop is a supermarket or convenience store. GP or pharmacy also counts clinics and hospitals. A gym includes fitness and sports centres. Schools include school buildings grouped into sites.</li>
+      <li>Walks follow footways, paths and streets at 4.8 km/h, so 15 minutes is 1,200 m. A street counts if its midpoint is within the walk.</li>
+      <li>Shares are by residential street length, not by people. A street of tenements counts the same as a cul-de-sac.</li>
+      <li>Zoomed out, each dot is a hexagon of about 0.7 km² coloured by its typical street. Zoom in to see every street.</li>
+      <li>Places up to 2 km outside a council count, so streets near a boundary can use a shop over the line.</li>
+    </ul>
+  </details>
+  <p class="credit">Streets and places &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, ODbL. Boundaries and place names: ONS, OGL v3, contains OS data &copy; Crown copyright 2025. Imagery: Esri, Maxar, Earthstar Geographics and the GIS User Community. Method adapted from Milan Janosov's city2graph tutorial. <a href="https://github.com/duncanCI/uk-15-minute-walk">Code</a>. Data built <span id="built"></span>.</p>
+</aside>
+<div class="legend" id="legend" aria-live="polite"></div>
+<div class="tip" id="tip"></div>
+
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const Q=new URLSearchParams(location.search);
+const IMG=Q.get("imagery")==="wayback"
+  ?"https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/26334/{z}/{y}/{x}"
+  :"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+const REF="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}";
+// class colours for "share of the selected needs in reach": none, some, half, most, all
+const CLS=["#ff4f6d","#ff9b45","#ffd84f","#c6f1ff","#2fb2ff"];
+const nf=new Intl.NumberFormat("en-GB");
+const HINT="Select a row to go there. Click a council on the map to add it, or add a place to measure a 1 km circle.";
+const S={min:15,on:[true,true,true,true],focus:{t:"uk"},added:[],pins:[],placing:false,k:4};
+let C=null, CATS=[], NATS=["England","Scotland","Wales","Northern Ireland"], places=null;
+const loaded=new Map(); let pinSeq=0;
+
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function cls(c,k){if(k<=0)return 0;if(c>=k)return 4;const f=c/k;return f===0?0:f<.5?1:f<.75?2:3}
+function mask(){return S.on.reduce((m,v,j)=>m|(v?1<<j:0),0)}
+
+// ---------------- stats
+function agg(list){let tot=0,all=0,cnt=0;const m=mask(),i=S.min-5;
+  for(const c of list){if(!c.tot)continue;tot+=c.tot;if(m)all+=c.cov[m-1][i];
+    for(let j=0;j<4;j++)if(S.on[j])cnt+=c.cov[(1<<j)-1][i]}
+  return{tot,all,cnt}}
+function focusStats(f){
+  if(f.t==="uk")return{name:"the United Kingdom",short:"United Kingdom",...agg(C.councils)};
+  if(f.t==="nat")return{name:f.v,short:f.v,...agg(C.councils.filter(c=>c.nation===f.v))};
+  if(f.t==="c"){const c=C.councils[f.v];return{name:c.name,short:c.name,...agg([c]),c}}
+  const p=S.pins.find(p=>p.id===f.v);return p?{name:p.name.replace(/^Around/,"the streets around"),short:p.name,tot:p.tot,all:p.all,cnt:p.cnt,pin:true}:{name:"",tot:0,all:0,cnt:0}}
+function needsPhrase(){const n=CATS.filter((c,j)=>S.on[j]).map(c=>c.label.startsWith("GP")?c.label:c.label.toLowerCase());
+  if(!n.length)return null;const w=n.map(x=>(/^[aeiou]/i.test(x)?"an ":"a ")+x);
+  return w.length===1?w[0]:w.slice(0,-1).join(", ")+" and "+w[w.length-1]}
+function renderText(){
+  $("walkv").textContent=`${S.min} min, ${nf.format(S.min*80)} m`;
+  const np=needsPhrase();
+  if(!np){$("headline").textContent="Pick at least one need to see who can walk to it.";$("sub").textContent="";return}
+  const f=focusStats(S.focus),pct=f.tot?Math.round(100*f.all/f.tot):0;
+  const where=f.pin?f.name:`residential streets in ${f.name}`;
+  $("headline").innerHTML=`${pct}% of ${esc(where)} are within a ${S.min}\u2011minute walk of ${esc(np)}.`;
+  if(f.c){const p=f.c.pois||{};$("sub").textContent=`In the data here: ${nf.format(p.daily_needs||0)} food shops, ${nf.format(p.health_services||0)} GPs, pharmacies or clinics, ${nf.format(p.education||0)} schools and ${nf.format(p.active_life||0)} gyms.`}
+  else $("sub").textContent=f.pin?"Measured over every residential street within 1 km.":`${nf.format(Math.round(f.tot/100))} km of residential street.`;
+}
+function rowEl(r,cur){
+  const li=document.createElement("li");li.className="row "+(r.cls||"");li.tabIndex=0;li.setAttribute("role","button");
+  if(cur)li.setAttribute("aria-current","true");
+  const sh=r.tot?r.all/r.tot:0,v=Math.round(sh*100)+"%",km=r.tot/100;
+  li.innerHTML=`<span class="nm">${esc(r.label)} <small>${km<10?km.toFixed(1):nf.format(Math.round(km))} km</small></span><span class="v">${v}</span><span class="bar"><i style="width:${(sh*100).toFixed(1)}%"></i></span>`;
+  li.setAttribute("aria-label",`${r.label}: ${v} of residential streets reach every selected need`);
+  if(r.rm){const x=document.createElement("button");x.className="x";x.textContent="\u00d7";x.setAttribute("aria-label","Remove "+r.label);
+    x.onclick=e=>{e.stopPropagation();r.rm()};li.appendChild(x)}
+  li.onclick=()=>r.go();li.onkeydown=e=>{if(e.target===li&&(e.key==="Enter"||e.key===" ")){e.preventDefault();r.go()}};
+  return li}
+const same=(a,b)=>a.t===b.t&&a.v===b.v;
+function renderRows(){
+  const ol=$("rows");ol.innerHTML="";const rows=[];
+  rows.push({f:{t:"uk"},label:"United Kingdom",cls:"lead",...agg(C.councils)});
+  for(const n of NATS)rows.push({f:{t:"nat",v:n},label:n,...agg(C.councils.filter(c=>c.nation===n))});
+  for(const ci of S.added){const c=C.councils[ci];rows.push({f:{t:"c",v:ci},label:c.name,...agg([c]),rm:()=>{S.added=S.added.filter(x=>x!==ci);if(same(S.focus,{t:"c",v:ci}))S.focus={t:"uk"};refresh()}})}
+  for(const p of S.pins)rows.push({f:{t:"p",v:p.id},label:p.name,cls:"pin",tot:p.tot,all:p.all,cnt:p.cnt,rm:()=>{S.pins=S.pins.filter(x=>x!==p);if(same(S.focus,{t:"p",v:p.id}))S.focus={t:"uk"};drawPins();refresh()}});
+  for(const r of rows){r.go=()=>goTo(r.f);ol.appendChild(rowEl(r,same(S.focus,r.f)))}
+  if($("rank").open)renderRanked();
+}
+function renderRanked(){
+  const nat=$("nat").value,ol=$("ranked");ol.innerHTML="";
+  const rs=C.councils.map((c,i)=>({i,c,...agg([c])})).filter(r=>r.tot&&(!nat||r.c.nation===nat)).sort((a,b)=>b.all/b.tot-a.all/a.tot);
+  rs.forEach((r,k)=>ol.appendChild(rowEl({label:`${k+1}. ${r.c.name}`,tot:r.tot,all:r.all,go:()=>{addCouncil(r.i);goTo({t:"c",v:r.i})}},same(S.focus,{t:"c",v:r.i}))));
+}
+$("rank").addEventListener("toggle",()=>{if($("rank").open)renderRanked()});
+$("nat").onchange=renderRanked;
+function addCouncil(ci){if(!S.added.includes(ci))S.added.push(ci)}
+function goTo(f){S.focus=f;
+  if(f.t==="uk")map.fitBounds([[-8.2,49.9],[1.8,60.9]],{padding:pad(),duration:900});
+  else if(f.t==="nat"){const b=bboxOf(C.councils.filter(c=>c.nation===f.v));map.fitBounds(b,{padding:pad(),duration:900})}
+  else if(f.t==="c"){const b=C.councils[f.v].bbox;map.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:pad(),duration:900})}
+  else{const p=S.pins.find(p=>p.id===f.v);if(p)map.flyTo({center:[p.lon,p.lat],zoom:13.6,duration:900})}
+  refresh()}
+function bboxOf(cs){let b=[180,90,-180,-90];for(const c of cs){b=[Math.min(b[0],c.bbox[0]),Math.min(b[1],c.bbox[1]),Math.max(b[2],c.bbox[2]),Math.max(b[3],c.bbox[3])]}return[[b[0],b[1]],[b[2],b[3]]]}
+function pad(){const w=innerWidth<=760;return w?{top:30,bottom:innerHeight*0.5,left:20,right:20}:{top:40,bottom:40,left:430,right:60}}
+
+// ---------------- map styling
+function countExpr(keys){const t=S.min*8,p=[];S.on.forEach((on,j)=>{if(on)p.push(["case",["<=",["get",keys[j]],t],1,0])});
+  return p.length===0?0:p.length===1?p[0]:["+",...p]}
+function colourExpr(keys){const k=S.k;if(!k)return CLS[0];const m=["match",countExpr(keys)];for(let c=0;c<=k;c++)m.push(c,CLS[cls(c,k)]);m.push(CLS[0]);return m}
+const SK=["a","b","c","e"], CK=["m0","m1","m2","m3"];
+function restyle(){
+  if(!map.getLayer("cells"))return;
+  map.setPaintProperty("cells","circle-color",colourExpr(CK));
+  for(const code of loaded.keys()){if(map.getLayer("l-"+code)){const e=colourExpr(SK);map.setPaintProperty("l-"+code,"line-color",e);map.setPaintProperty("g-"+code,"line-color",e)}}
+  renderLegend()}
+function renderLegend(){
+  const k=S.k,items=[];if(!k){$("legend").innerHTML="<strong>Pick a need to colour the map</strong>";return}
+  for(let c=k;c>=0;c--)items.push(`<div class="k"><i style="background:${CLS[cls(c,k)]}"></i>${c===k?(k===1?"In reach":`All ${k} in reach`):c===0?"None in reach":`${c} of ${k} in reach`}</div>`);
+  $("legend").innerHTML=`<strong>Needs within a ${S.min}\u2011minute walk</strong>${items.join("")}`}
+
+// ---------------- data
+async function getBin(url){const r=await fetch(url);if(!r.ok)throw new Error(url+" "+r.status);return r.arrayBuffer()}
+function cellsGeoJSON(buf){
+  const dv=new DataView(buf),n=dv.getUint32(8,true),o=32;
+  const xy=new Float32Array(buf,o,n*2),len=new Uint16Array(buf,o+8*n,n),ci=new Uint16Array(buf,o+10*n,n),m=new Uint8Array(buf,o+12*n,n*4);
+  const f=new Array(n);
+  for(let i=0;i<n;i++)f[i]={type:"Feature",geometry:{type:"Point",coordinates:[xy[2*i],xy[2*i+1]]},properties:{len:len[i],ci:ci[i],m0:m[4*i],m1:m[4*i+1],m2:m[4*i+2],m3:m[4*i+3]}};
+  return{type:"FeatureCollection",features:f}}
+function parseStreets(buf){
+  const dv=new DataView(buf),n=dv.getUint32(8,true),nd=dv.getUint32(12,true),o=32;
+  const first=new Int32Array(buf,o,n*2),len=new Uint16Array(buf,o+8*n,n),del=new Int16Array(buf,o+10*n,nd*2),
+    nv=new Uint8Array(buf,o+10*n+4*nd,n),d=new Uint8Array(buf,o+10*n+4*nd+n,n*4);
+  const feats=new Array(n),mid=new Float32Array(n*2);let p=0;
+  for(let i=0;i<n;i++){let x=first[2*i],y=first[2*i+1];const c=[[x/1e5,y/1e5]];
+    for(let j=1;j<nv[i];j++){x+=del[2*p];y+=del[2*p+1];p++;c.push([x/1e5,y/1e5])}
+    const mc=c[c.length>>1];mid[2*i]=mc[0];mid[2*i+1]=mc[1];
+    feats[i]={type:"Feature",geometry:{type:"LineString",coordinates:c},properties:{a:d[4*i],b:d[4*i+1],c:d[4*i+2],e:d[4*i+3]}}}
+  return{n,len,d,mid,fc:{type:"FeatureCollection",features:feats}}}
+const pending=new Map();
+function loadCouncil(ci){
+  const c=C.councils[ci];if(!c.has)return Promise.resolve(null);
+  if(loaded.has(c.code)){const L=loaded.get(c.code);L.used=performance.now();return Promise.resolve(L)}
+  if(pending.has(c.code))return pending.get(c.code);
+  const pr=getBin(`data/streets/${c.code}.bin`).then(buf=>{
+    const s=parseStreets(buf);s.ci=ci;s.used=performance.now();
+    map.addSource("s-"+c.code,{type:"geojson",data:s.fc,tolerance:0.2});
+    const e=colourExpr(SK);
+    map.addLayer({id:"g-"+c.code,type:"line",source:"s-"+c.code,minzoom:10.5,layout:{"line-cap":"round","line-join":"round"},
+      paint:{"line-color":e,"line-width":["interpolate",["linear"],["zoom"],11,2,14,5,17,11],"line-blur":["interpolate",["linear"],["zoom"],11,1.5,17,6],
+        "line-opacity":["interpolate",["linear"],["zoom"],10.5,0,12,0.22]}},"cells");
+    map.addLayer({id:"l-"+c.code,type:"line",source:"s-"+c.code,minzoom:10.5,layout:{"line-cap":"round","line-join":"round"},
+      paint:{"line-color":e,"line-width":["interpolate",["linear"],["zoom"],11,0.7,14,1.6,17,3.2],
+        "line-opacity":["interpolate",["linear"],["zoom"],10.5,0,12,0.88]}},"cells");
+    s.fc=null;loaded.set(c.code,s);pending.delete(c.code);evict();return s})
+    .catch(err=>{pending.delete(c.code);console.warn(err);return null});
+  pending.set(c.code,pr);return pr}
+function evict(){if(loaded.size<=28)return;const inView=new Set(visibleCouncils());
+  const old=[...loaded.entries()].filter(([code,s])=>!inView.has(s.ci)&&!S.pins.some(p=>p.cs.includes(s.ci))).sort((a,b)=>a[1].used-b[1].used);
+  for(const [code] of old.slice(0,loaded.size-24)){map.removeLayer("l-"+code);map.removeLayer("g-"+code);map.removeSource("s-"+code);loaded.delete(code)}}
+function visibleCouncils(){const b=map.getBounds(),w=b.getWest(),s=b.getSouth(),e=b.getEast(),n=b.getNorth(),ctr=map.getCenter();
+  return C.councils.map((c,i)=>({i,c})).filter(({c})=>c.has&&c.bbox[0]<e&&c.bbox[2]>w&&c.bbox[1]<n&&c.bbox[3]>s)
+    .sort((a,b)=>dist2(a.c,ctr)-dist2(b.c,ctr)).slice(0,14).map(x=>x.i)}
+function dist2(c,p){const x=(c.bbox[0]+c.bbox[2])/2-p.lng,y=(c.bbox[1]+c.bbox[3])/2-p.lat;return x*x+y*y}
+function onMove(){if(map.getZoom()>=10.3)visibleCouncils().forEach(loadCouncil)}
+
+// ---------------- pins
+function hav(lon1,lat1,lon2,lat2){const r=Math.PI/180,dl=(lat2-lat1)*r,dn=(lon2-lon1)*r;const a=Math.sin(dl/2)**2+Math.cos(lat1*r)*Math.cos(lat2*r)*Math.sin(dn/2)**2;return 12742000*Math.asin(Math.sqrt(a))}
+async function addPin(lon,lat){
+  const dLat=1000/111320,dLon=dLat/Math.cos(lat*Math.PI/180);
+  const cs=C.councils.map((c,i)=>i).filter(i=>{const b=C.councils[i].bbox;return C.councils[i].has&&b[0]<lon+dLon&&b[2]>lon-dLon&&b[1]<lat+dLat&&b[3]>lat-dLat});
+  const id=++pinSeq,p={id,lon,lat,cs,sel:[],name:"Around "+nearestName(lon,lat)};
+  togglePlacing(false);$("hint").textContent="Measuring the streets inside the circle.";
+  const L=await Promise.all(cs.map(loadCouncil));
+  L.forEach(s=>{if(!s)return;const idx=[];for(let i=0;i<s.n;i++)if(Math.abs(s.mid[2*i+1]-lat)<dLat&&Math.abs(s.mid[2*i]-lon)<dLon&&hav(lon,lat,s.mid[2*i],s.mid[2*i+1])<=1000)idx.push(i);p.sel.push([s,idx])});
+  const n=p.sel.reduce((a,[s,idx])=>a+idx.length,0);
+  if(!n){$("hint").textContent="No residential streets within 1 km of that spot. Try somewhere built up.";return}
+  S.pins.push(p);$("hint").textContent=HINT;S.focus={t:"p",v:id};drawPins();refresh()}
+function pinStats(){const t=S.min*8,k=S.k;
+  for(const p of S.pins){p.tot=0;p.all=0;p.cnt=0;for(const [s,idx] of p.sel)for(const i of idx){const L=s.len[i]/10;let c=0;for(let j=0;j<4;j++)if(S.on[j]&&s.d[4*i+j]<=t)c++;p.tot+=L;p.cnt+=c*L;if(k&&c===k)p.all+=L}}}
+function drawPins(){const f=S.pins.map(p=>{const ring=[];for(let a=0;a<=64;a++){const th=a/64*2*Math.PI;ring.push([p.lon+Math.cos(th)*1000/(111320*Math.cos(p.lat*Math.PI/180)),p.lat+Math.sin(th)*1000/111320])}
+  return{type:"Feature",geometry:{type:"LineString",coordinates:ring},properties:{id:p.id}}});
+  map.getSource("pins")&&map.getSource("pins").setData({type:"FeatureCollection",features:f})}
+function nearestName(lon,lat){if(places){let best=null,bd=1e9;for(const p of places){const d=(p[1]-lon)**2*0.33+(p[2]-lat)**2;if(d<bd){bd=d;best=p[0]}}if(best&&bd<0.0009)return best}
+  const c=C.councils.find(c=>c.bbox[0]<=lon&&c.bbox[2]>=lon&&c.bbox[1]<=lat&&c.bbox[3]>=lat);return c?c.name:"this spot"}
+function togglePlacing(on){S.placing=on;const b=$("addpin");b.setAttribute("aria-pressed",String(on));b.textContent=on?"Cancel":"Add a place";
+  map.getCanvas().style.cursor=on?"crosshair":"";$("hint").textContent=on?"Click the map where you want to measure. The circle has a 1 km radius.":HINT;if(on)loadPlaces()}
+$("addpin").onclick=()=>togglePlacing(!S.placing);
+
+// ---------------- search
+async function loadPlaces(){if(places)return places;try{places=await (await fetch("data/places.json")).json()}catch(e){places=[]}return places}
+let hits=[],sel=-1;
+async function search(q){q=q.trim().toLowerCase();const res=$("res");if(q.length<2){res.style.display="none";$("q").setAttribute("aria-expanded","false");return}
+  await loadPlaces();hits=[];
+  C.councils.forEach((c,i)=>{if(c.name.toLowerCase().includes(q))hits.push({t:"c",i,name:c.name,note:"Council",rank:c.name.toLowerCase().startsWith(q)?0:1})});
+  for(const p of places){const n=p[0].toLowerCase();if(n.startsWith(q)){hits.push({t:"p",p,name:p[0],note:"Place",rank:2});if(hits.length>60)break}}
+  hits.sort((a,b)=>a.rank-b.rank||a.name.length-b.name.length);hits=hits.slice(0,8);sel=hits.length?0:-1;
+  res.innerHTML=hits.length?hits.map((h,i)=>`<li role="option" id="h${i}" aria-selected="${i===sel}"><span>${esc(h.name)}</span><small>${h.note}</small></li>`).join(""):`<li aria-disabled="true"><span>No match. Try a town or council name.</span></li>`;
+  res.style.display="block";$("q").setAttribute("aria-expanded","true");
+  [...res.children].forEach((li,i)=>li.onmousedown=e=>{e.preventDefault();choose(i)})}
+function choose(i){const h=hits[i];if(!h)return;$("res").style.display="none";$("q").value=h.name;$("q").setAttribute("aria-expanded","false");
+  if(h.t==="c"){addCouncil(h.i);goTo({t:"c",v:h.i})}else map.flyTo({center:[h.p[1],h.p[2]],zoom:13.2,duration:1200})}
+$("q").addEventListener("input",e=>search(e.target.value));
+$("q").addEventListener("keydown",e=>{const res=$("res");if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();if(!hits.length)return;sel=(sel+(e.key==="ArrowDown"?1:hits.length-1))%hits.length;[...res.children].forEach((li,i)=>li.setAttribute("aria-selected",String(i===sel)))}
+  else if(e.key==="Enter"){e.preventDefault();choose(Math.max(sel,0))}else if(e.key==="Escape"){res.style.display="none"}});
+$("q").addEventListener("blur",()=>setTimeout(()=>$("res").style.display="none",120));
+
+// ---------------- tooltip
+const TIP=$("tip");
+function showTip(e){if(S.placing){TIP.style.display="none";return}
+  const layers=[...loaded.keys()].map(c=>"l-"+c).filter(id=>map.getLayer(id));
+  const box=[[e.point.x-4,e.point.y-4],[e.point.x+4,e.point.y+4]];
+  let f=layers.length&&map.getZoom()>=11.5?map.queryRenderedFeatures(box,{layers})[0]:null,keys=SK,title="This street",note="";
+  if(!f&&map.getZoom()<12.5){f=map.queryRenderedFeatures(box,{layers:["cells"]})[0];keys=CK;title="Typical street here";if(f)note=`${nf.format(Math.round(f.properties.len))} m of residential street in this hexagon`}
+  if(!f){TIP.style.display="none";return}
+  const cf=map.queryRenderedFeatures(e.point,{layers:["council-fill"]})[0];
+  const t=S.min*8,rows=CATS.map((c,j)=>{if(!S.on[j])return"";const v=+f.properties[keys[j]];return`<tr class="${v>t?"far":""}"><td>${esc(c.label)}</td><td>${v>=255?"over 2.5 km":nf.format(v*10)+" m"}</td></tr>`}).join("");
+  TIP.innerHTML=`<h3>${title}${cf?`, ${esc(cf.properties.name)}`:""}</h3><table>${rows}</table><p style="margin:6px 0 0;color:var(--muted)">${note||"Walk to the nearest one"}</p>`;
+  TIP.style.display="block";const w=TIP.offsetWidth,h=TIP.offsetHeight;let x=e.originalEvent.clientX+16,y=e.originalEvent.clientY+16;
+  if(x+w>innerWidth-8)x-=w+32;if(y+h>innerHeight-8)y-=h+32;TIP.style.left=x+"px";TIP.style.top=y+"px"}
+
+// ---------------- controls
+function refresh(){S.k=S.on.filter(Boolean).length;pinStats();renderText();renderRows();restyle();
+  if(map.getLayer("council-focus"))map.setFilter("council-focus",["==",["get","code"],S.focus.t==="c"?C.councils[S.focus.v].code:""])}
+let rt=0;$("walk").addEventListener("input",e=>{S.min=+e.target.value;renderText();clearTimeout(rt);rt=setTimeout(refresh,60)});
+$("hint").textContent=HINT;
+
+// ---------------- map
+const map=new maplibregl.Map({container:"map",hash:"map",maxBounds:[[-15,47.5],[6,62.5]],minZoom:4.3,maxZoom:18.5,attributionControl:{compact:true},
+  bounds:[[-8.2,49.9],[1.8,60.9]],fitBoundsOptions:{padding:pad()},
+  style:{version:8,sources:{
+    img:{type:"raster",tiles:[IMG],tileSize:256,maxzoom:19,attribution:"Powered by <a href=\"https://www.esri.com\">Esri</a>. Imagery: Esri, Maxar, Earthstar Geographics, and the GIS User Community"},
+    ref:{type:"raster",tiles:[REF],tileSize:256,maxzoom:19}},
+    layers:[{id:"img",type:"raster",source:"img",paint:{"raster-saturation":-0.35,"raster-brightness-max":0.72,"raster-contrast":0.08}},
+            {id:"ref",type:"raster",source:"ref",paint:{"raster-opacity":0.9}}]}});
+map.addControl(new maplibregl.NavigationControl({showCompass:false}),"top-right");
+map.addControl(new maplibregl.ScaleControl({unit:"metric"}),"bottom-right");
+
+map.on("load",async()=>{
+  const [cj,cells]=await Promise.all([fetch("data/councils.json").then(r=>r.json()),getBin("data/cells.bin")]);
+  C=cj;CATS=cj.cats;$("built").textContent=cj.built;
+  $("ranksum").textContent=`All ${cj.councils.filter(c=>c.tot).length} councils, ranked`;
+  CATS.forEach((c,i)=>{const d=document.createElement("div");d.className="chip";d.innerHTML=`<input type="checkbox" id="c${i}" checked><label for="c${i}">${esc(c.label)}</label>`;
+    d.querySelector("input").onchange=e=>{S.on[i]=e.target.checked;refresh()};$("chips").appendChild(d)});
+  map.addSource("councils",{type:"geojson",data:"data/councils.geojson"});
+  map.addSource("cells",{type:"geojson",data:cellsGeoJSON(cells)});
+  map.addSource("pins",{type:"geojson",data:{type:"FeatureCollection",features:[]}});
+  map.addLayer({id:"council-fill",type:"fill",source:"councils",paint:{"fill-color":"#000","fill-opacity":0}},"ref");
+  map.addLayer({id:"council-line",type:"line",source:"councils",paint:{"line-color":"#ffffff","line-opacity":["interpolate",["linear"],["zoom"],5,0.18,9,0.5],"line-width":["interpolate",["linear"],["zoom"],5,0.3,10,1]}},"ref");
+  map.addLayer({id:"cells",type:"circle",source:"cells",maxzoom:12.6,paint:{
+    "circle-color":colourExpr(CK),
+    "circle-radius":["interpolate",["exponential",2],["zoom"],4,["max",1.1,["*",0.0016,["sqrt",["get","len"]]]],12,["*",0.2,["sqrt",["get","len"]]]],
+    "circle-blur":["interpolate",["linear"],["zoom"],5,0.2,11,0.6],
+    "circle-opacity":["interpolate",["linear"],["zoom"],4,0.8,9,0.85,11,0.65,12.5,0]}},"ref");
+  map.addLayer({id:"council-focus",type:"line",source:"councils",filter:["==",["get","code"],""],paint:{"line-color":"#ffffff","line-width":2.6}},"ref");
+  map.addLayer({id:"pins",type:"line",source:"pins",paint:{"line-color":"#ffffff","line-width":2.5,"line-dasharray":[2,1.5]}});
+  map.on("moveend",onMove);onMove();
+  map.on("mousemove",showTip);map.on("mouseout",()=>TIP.style.display="none");
+  map.on("click",e=>{if(S.placing){addPin(e.lngLat.lng,e.lngLat.lat);return}
+    const f=map.queryRenderedFeatures(e.point,{layers:["council-fill"]})[0];if(!f)return;
+    const ci=C.councils.findIndex(c=>c.code===f.properties.code);if(ci<0)return;addCouncil(ci);S.focus={t:"c",v:ci};refresh()});
+  refresh();
+});
+})();
+</script>
+</body>
+</html>

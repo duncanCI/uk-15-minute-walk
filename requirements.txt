@@ -1,0 +1,12 @@
+# Tested with the versions in brackets
+city2graph>=1.0      # (1.0.0)
+geopandas>=1.0       # (1.2.0)
+shapely>=2.0         # (2.1.2)
+pyproj>=3.6          # (3.8.0)
+scipy>=1.11          # (1.17.1)
+numpy>=1.26
+pandas>=2.1
+pyarrow>=14
+matplotlib>=3.8
+requests>=2.31
+h3>=4.0              # (4.5.0)

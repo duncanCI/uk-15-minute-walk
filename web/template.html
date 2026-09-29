@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How far is daily life? A 15-minute walk map of the Glasgow City Region</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#e8ebec; --panel:#f4f6f6; --ink:#1d2327; --muted:#5b666d; --rule:#c9d0d3;
+  --accent:#d4561a; --accent-ink:#ffffff;
+  --map-bg:#dde2e4; --water:#c3d3dc; --outline:#6f7b81; --label:#2b3338; --halo:rgba(232,235,236,.85);
+  --r0:#d4a998; --r1:#c6d0d4; --r2:#8eafbf; --r3:#4b7c95; --r4:#163c52;
+  --font:"Schibsted Grotesk","Helvetica Neue",Arial,sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#171c1f; --panel:#1e2428; --ink:#e6e9ea; --muted:#9aa5ab; --rule:#323b40;
+    --accent:#f07a3a; --accent-ink:#171c1f;
+    --map-bg:#12171a; --water:#1b2e39; --outline:#7c878d; --label:#dfe4e6; --halo:rgba(18,23,26,.85);
+    --r0:#6b3f33; --r1:#3a474d; --r2:#3f6f85; --r3:#6fa7be; --r4:#d2eaf3;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#171c1f; --panel:#1e2428; --ink:#e6e9ea; --muted:#9aa5ab; --rule:#323b40;
+  --accent:#f07a3a; --accent-ink:#171c1f;
+  --map-bg:#12171a; --water:#1b2e39; --outline:#7c878d; --label:#dfe4e6; --halo:rgba(18,23,26,.85);
+  --r0:#6b3f33; --r1:#3a474d; --r2:#3f6f85; --r3:#6fa7be; --r4:#d2eaf3;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
+body{margin:0;height:100%;background:var(--paper);color:var(--ink);font:400 15px/1.45 var(--font);
+  font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 400px;height:100%}
+.map{position:relative;background:var(--map-bg);overflow:hidden;touch-action:none;min-height:0}
+canvas{display:block;width:100%;height:100%;cursor:grab}
+canvas.dragging{cursor:grabbing}
+canvas.placing{cursor:crosshair}
+canvas:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
+.side{background:var(--panel);border-left:1px solid var(--rule);overflow-y:auto;padding:28px 28px 20px}
+h1{font-size:30px;line-height:1.12;font-weight:800;letter-spacing:-.02em;margin:0 0 22px;max-width:22ch}
+h1 b{font-weight:800}
+.lede{color:var(--muted);margin:-8px 0 22px;max-width:44ch}
+fieldset{border:0;padding:0;margin:0 0 20px}
+legend,.ctl-label{font-weight:700;font-size:14px;margin-bottom:8px;padding:0;display:block}
+.ctl-label span{font-weight:400;color:var(--muted)}
+input[type=range]{width:100%;accent-color:var(--accent);height:28px}
+.ticks{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-top:-2px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{position:relative}
+.chip input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.chip label{display:inline-flex;align-items:center;gap:8px;padding:7px 12px 7px 10px;border:1.5px solid var(--rule);
+  border-radius:20px;font-size:14px;cursor:pointer;user-select:none;background:var(--paper)}
+.chip label::before{content:"";width:14px;height:14px;border-radius:3px;border:1.5px solid var(--muted);flex:none}
+.chip input:checked+label{border-color:var(--ink)}
+.chip input:checked+label::before{background:var(--ink);border-color:var(--ink);box-shadow:inset 0 0 0 2px var(--paper)}
+.chip input:focus-visible+label{outline:3px solid var(--accent);outline-offset:2px}
+.seg{display:inline-flex;border:1.5px solid var(--ink);border-radius:6px;overflow:hidden}
+.seg button{font:500 14px var(--font);padding:7px 12px;border:0;background:transparent;color:var(--ink);cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--paper)}
+.seg button:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
+.compare-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:26px 0 6px;
+  border-top:1px solid var(--rule);padding-top:18px}
+.compare-head h2{font-size:18px;margin:0;font-weight:700}
+.btn{font:500 14px var(--font);border:1.5px solid var(--accent);color:var(--accent);background:transparent;
+  border-radius:6px;padding:6px 12px;cursor:pointer;white-space:nowrap}
+.btn[aria-pressed=true]{background:var(--accent);color:var(--accent-ink)}
+.btn:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.hint{color:var(--muted);font-size:13px;margin:0 0 10px}
+ol.rows{list-style:none;margin:0;padding:0}
+.row{display:grid;grid-template-columns:minmax(0,1fr) 46px 24px;align-items:center;gap:4px 10px;
+  padding:8px 6px;border-radius:6px;cursor:pointer}
+.row:hover{background:color-mix(in srgb,var(--ink) 6%,transparent)}
+.row[aria-current=true]{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.row:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
+.row .name{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .name small{color:var(--muted);font-weight:400}
+.row .val{text-align:right;font-weight:700}
+.row .bar{grid-column:1/3;height:6px;background:var(--rule);border-radius:3px;overflow:hidden}
+.row .bar i{display:block;height:100%;background:var(--r3)}
+.row.pin .bar i{background:var(--accent)}
+.row .x{grid-row:1;grid-column:3;border:0;background:transparent;color:var(--muted);font-size:18px;cursor:pointer;
+  line-height:1;padding:2px;border-radius:4px}
+.row .x:focus-visible{outline:2px solid var(--accent)}
+.row.region .name{font-weight:700}
+.legend{position:absolute;left:16px;bottom:16px;background:var(--panel);
+  border:1px solid var(--rule);border-radius:6px;padding:10px 12px;font-size:12px;width:230px}
+.legend strong{display:block;font-size:13px;margin-bottom:6px;line-height:1.25}
+.ramp{display:flex;height:10px;border-radius:2px;overflow:hidden}
+.ramp i{flex:1}
+.ramp-lab{display:flex;justify-content:space-between;color:var(--muted);margin-top:3px}
+.zoom{position:absolute;right:14px;top:14px;display:flex;flex-direction:column;gap:6px}
+.zoom button{width:36px;height:36px;border-radius:6px;border:1px solid var(--rule);background:var(--panel);color:var(--ink);
+  font:500 20px/1 var(--font);cursor:pointer}
+.zoom button:focus-visible{outline:3px solid var(--accent)}
+.tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--rule);border-radius:6px;
+  padding:9px 11px;font-size:13px;width:250px;display:none;box-shadow:0 2px 10px rgba(0,0,0,.12)}
+.tip h3{margin:0 0 4px;font-size:14px}
+.tip table{border-collapse:collapse;width:100%}
+.tip td{padding:1px 0}.tip td+td{text-align:right;padding-left:12px;white-space:nowrap}
+.tip .far{color:var(--muted)}
+details{margin-top:24px;border-top:1px solid var(--rule);padding-top:14px;font-size:14px}
+summary{font-weight:700;cursor:pointer}
+details p,details li{color:var(--muted);max-width:60ch}
+details ul{padding-left:18px}
+.credit{font-size:12px;color:var(--muted);margin-top:18px}
+.credit a{color:inherit}
+@media (max-width:860px){
+  .app{grid-template-columns:1fr;grid-template-rows:56vh auto;height:auto;min-height:100%}
+  .map{height:56vh}
+  .side{border-left:0;border-top:1px solid var(--rule);padding:22px 18px}
+  h1{font-size:25px}
+  .legend{width:180px;padding:8px 10px;left:10px;bottom:10px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="map" id="map">
+    <canvas id="cv" tabindex="0" aria-label="Map of residential streets coloured by walking access. Drag to pan, scroll or use plus and minus to zoom."></canvas>
+    <div class="zoom">
+      <button id="zin" aria-label="Zoom in">+</button>
+      <button id="zout" aria-label="Zoom out">&minus;</button>
+      <button id="zfit" aria-label="Show the whole area" style="font-size:15px">&#8634;</button>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="tip" id="tip" role="status"></div>
+  </div>
+  <aside class="side">
+    <h1 id="headline" aria-live="polite"></h1>
+    <p class="lede">Each hexagon shows how much of its residential street length sits within the walk you choose. Change the walk and the needs, then compare places.</p>
+
+    <div>
+      <label class="ctl-label" for="walk">Walk time <span id="walkv"></span></label>
+      <input id="walk" type="range" min="5" max="25" step="1" value="15">
+      <div class="ticks"><span>5 min</span><span>15 min</span><span>25 min</span></div>
+    </div>
+
+    <fieldset style="margin-top:18px">
+      <legend>Needs that count</legend>
+      <div class="chips" id="chips"></div>
+    </fieldset>
+
+    <div>
+      <span class="ctl-label" id="modelab">Colour the map by</span>
+      <div class="seg" role="group" aria-labelledby="modelab">
+        <button id="m-all" aria-pressed="true">Reach to all</button>
+        <button id="m-count" aria-pressed="false">Needs in reach</button>
+      </div>
+    </div>
+
+    <div class="compare-head">
+      <h2>Compare places</h2>
+      <button class="btn" id="addpin" aria-pressed="false">Add a place</button>
+    </div>
+    <p class="hint" id="pinhint"></p>
+    <ol class="rows" id="rows"></ol>
+
+    <details>
+      <summary>Read this before quoting a number</summary>
+      <p>The places come from OpenStreetMap. Where mapping is thin, a street can look cut off when it is not. Inverclyde, for example, has 7 GP, pharmacy, clinic or hospital locations in the data. Check any low figure against NHS or council lists before you use it.</p>
+      <ul>
+        <li>A food shop is a supermarket or convenience store. GP or pharmacy also counts clinics and hospitals. A gym includes fitness and sports centres.</li>
+        <li>Distances follow footways, paths and streets. Walk speed is 4.8 km/h, so 15 minutes is 1,200 m.</li>
+        <li>A street counts if its midpoint is within the walk. Shares are by street length, not by people, so a street of tenements counts the same as a cul-de-sac.</li>
+        <li>Schools are school buildings grouped into sites, because school grounds were not in the source data.</li>
+        <li>Places up to 2 km outside the region count, so streets near a boundary can use a shop over the line.</li>
+      </ul>
+    </details>
+    <p class="credit">Street and place data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, ODbL. Boundaries and place names: Office for National Statistics, OGL v3. Method adapted from Milan Janosov's city2graph tutorial. Built <span id="built"></span>.</p>
+  </aside>
+</div>
+<script>
+const DATA=/*__DATA__*/null;
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const dec=(s,T)=>{const b=atob(s),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return new T(u.buffer)};
+const N=DATA.n, NH=DATA.nh, CATS=DATA.cats, NC=CATS.length;
+const sHex=dec(DATA.seg.hex,Uint16Array), sLen=dec(DATA.seg.len,Uint16Array),
+      sArea=dec(DATA.seg.area,Uint8Array), sDist=dec(DATA.seg.dist,Uint8Array);
+const hv=dec(DATA.hex.v,Uint16Array), hc=dec(DATA.hex.c,Uint16Array);
+const AREAS=DATA.areas, NA=AREAS.length;
+const nf=new Intl.NumberFormat("en-GB");
+const HINT="Select a row to zoom to it. Add a place to measure a 1 km circle anywhere on the map.";
+
+const S={min:15,on:CATS.map(()=>true),mode:"all",focus:-1,pins:[],placing:false,k:NC};
+let pinSeq=0;
+const PIN_R=1000/DATA.unit;
+
+const hTot=new Float64Array(NH), hAll=new Float64Array(NH), hCnt=new Float64Array(NH);
+const hSegs=Array.from({length:NH},()=>[]);
+for(let i=0;i<N;i++){hTot[sHex[i]]+=sLen[i];hSegs[sHex[i]].push(i)}
+
+const aBounds=AREAS.map(a=>{let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const r of a.rings)for(let i=0;i<r.length;i+=2){const x=r[i],y=r[i+1];if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}return[x0,y0,x1,y1]});
+const full=aBounds.reduce((b,a)=>[Math.min(b[0],a[0]),Math.min(b[1],a[1]),Math.max(b[2],a[2]),Math.max(b[3],a[3])],[1e9,1e9,-1e9,-1e9]);
+
+const CELL=400, grid=new Map();
+for(let h=0;h<NH;h++){const k=((hc[2*h]/CELL)|0)*100000+((hc[2*h+1]/CELL)|0);let a=grid.get(k);if(!a)grid.set(k,a=[]);a.push(h)}
+function hexesNear(x,y,r){const out=[];const i0=Math.floor((x-r)/CELL),i1=Math.floor((x+r)/CELL),j0=Math.floor((y-r)/CELL),j1=Math.floor((y+r)/CELL);
+  for(let i=i0;i<=i1;i++)for(let j=j0;j<=j1;j++){const a=grid.get(i*100000+j);if(!a)continue;
+    for(const h of a){const ddx=hc[2*h]-x,ddy=hc[2*h+1]-y;if(ddx*ddx+ddy*ddy<=r*r)out.push(h)}}return out}
+function nearestHex(x,y){let best=-1,bd=110*110;for(const h of hexesNear(x,y,110)){const ddx=hc[2*h]-x,ddy=hc[2*h+1]-y,d=ddx*ddx+ddy*ddy;if(d<bd){bd=d;best=h}}return best}
+function nearestPlace(x,y){let best=null,bd=Infinity;for(const p of DATA.places){const d=(p[1]-x)**2+(p[2]-y)**2;if(d<bd){bd=d;best=p}}return best?best[0]:"this spot"}
+
+let aTot, aAll, aCnt, rTot=0, rAll=0, rCnt=0;
+function compute(){
+  const t=S.min*8, on=S.on, k=on.reduce((s,v)=>s+(v?1:0),0);
+  hAll.fill(0);hCnt.fill(0);
+  aTot=new Float64Array(NA);aAll=new Float64Array(NA);aCnt=new Float64Array(NA);
+  rTot=rAll=rCnt=0;
+  for(let i=0;i<N;i++){
+    let c=0;const b=i*NC;
+    for(let j=0;j<NC;j++) if(on[j]&&sDist[b+j]<=t)c++;
+    const L=sLen[i], h=sHex[i], a=sArea[i], all=(k>0&&c===k)?L:0;
+    hAll[h]+=all;hCnt[h]+=c*L;aTot[a]+=L;aAll[a]+=all;aCnt[a]+=c*L;rTot+=L;rAll+=all;rCnt+=c*L;
+  }
+  for(const p of S.pins){p.tot=0;p.all=0;p.cnt=0;for(const h of p.hexes){p.tot+=hTot[h];p.all+=hAll[h];p.cnt+=hCnt[h]}}
+  S.k=k;
+}
+
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function needsPhrase(){
+  const names=CATS.filter((c,i)=>S.on[i]).map(c=>c.label.startsWith("GP")?c.label:c.label.toLowerCase());
+  if(!names.length)return null;
+  const w=names.map(n=>(/^[aeiou]/i.test(n)?"an ":"a ")+n);
+  return w.length===1?w[0]:w.slice(0,-1).join(", ")+" and "+w[w.length-1];
+}
+function focusItem(){
+  if(S.focus===-1)return{name:DATA.title,tot:rTot,all:rAll,cnt:rCnt};
+  if(S.focus>=0)return{name:AREAS[S.focus].name,tot:aTot[S.focus],all:aAll[S.focus],cnt:aCnt[S.focus]};
+  const p=S.pins.find(p=>p.id===-S.focus-2);return p?{name:p.name.replace(/^Around/,"around"),tot:p.tot,all:p.all,cnt:p.cnt,pin:true}:{name:DATA.title,tot:rTot,all:rAll,cnt:rCnt};
+}
+function renderText(){
+  $("walkv").textContent=`${S.min} min, ${nf.format(S.min*80)} m`;
+  const np=needsPhrase();
+  if(!np){$("headline").textContent="Pick at least one need to see who can walk to it.";return}
+  const f=focusItem(), pct=Math.round(100*(f.tot?f.all/f.tot:0)), mins=`${S.min}\u2011minute`;
+  const where=f.pin?`the streets ${esc(f.name)}`:`residential streets in ${esc(f.name)}`;
+  if(S.mode==="count"&&S.k>1){
+    const avg=(f.tot?f.cnt/f.tot:0).toFixed(1);
+    const who=f.pin?`Streets ${esc(f.name)}`:`Residential streets in ${esc(f.name)}`;
+    $("headline").innerHTML=`${who} reach <b>${avg} of ${S.k}</b> needs, on average, within a ${mins} walk.`;
+  } else {
+    $("headline").innerHTML=`<b>${pct}%</b> of ${where} are within a ${mins} walk of ${esc(np)}.`;
+  }
+}
+function rowsData(){
+  const mk=(key,name,tot,all,cnt,cls,pin)=>({key,name,share:tot?all/tot:0,cnt:tot?cnt/tot:0,km:tot/1000,cls,pin});
+  const r=[mk(-1,DATA.title,rTot,rAll,rCnt,"region")];
+  const c=AREAS.map((a,i)=>mk(i,a.name,aTot[i],aAll[i],aCnt[i],"")).sort((a,b)=>b.share-a.share);
+  const p=S.pins.map(p=>mk(-p.id-2,p.name,p.tot,p.all,p.cnt,"pin",p.id));
+  return [...r,...p,...c];
+}
+function renderRows(){
+  const ol=$("rows");ol.innerHTML="";
+  for(const d of rowsData()){
+    const li=document.createElement("li");
+    li.className="row "+d.cls;li.tabIndex=0;li.setAttribute("role","button");
+    if(S.focus===d.key)li.setAttribute("aria-current","true");
+    const v=S.mode==="all"?Math.round(d.share*100)+"%":d.cnt.toFixed(1);
+    const w=S.mode==="all"?d.share:(S.k?d.cnt/S.k:0);
+    const km=d.km<10?d.km.toFixed(1):nf.format(Math.round(d.km));
+    li.innerHTML=`<span class="name">${esc(d.name)} <small>${km} km of street</small></span><span class="val">${v}</span><span class="bar"><i style="width:${(w*100).toFixed(1)}%"></i></span>`;
+    li.setAttribute("aria-label",`${d.name}: ${S.mode==="all"?v+" of streets reach every selected need":v+" of "+S.k+" needs in reach on average"}`);
+    if(d.pin!==undefined){const x=document.createElement("button");x.className="x";x.textContent="\u00d7";x.setAttribute("aria-label","Remove "+d.name);
+      x.onclick=e=>{e.stopPropagation();S.pins=S.pins.filter(p=>p.id!==d.pin);if(S.focus===d.key)S.focus=-1;update()};li.appendChild(x)}
+    li.onclick=()=>setFocus(d.key);
+    li.onkeydown=e=>{if(e.target!==li)return;if(e.key==="Enter"||e.key===" "){e.preventDefault();setFocus(d.key)}};
+    ol.appendChild(li);
+  }
+}
+function setFocus(key){
+  S.focus=key;
+  if(key===-1)fit(full);else if(key>=0)fit(aBounds[key]);
+  else{const p=S.pins.find(p=>p.id===-key-2);if(p)fit([p.x-PIN_R*2.2,p.y-PIN_R*2.2,p.x+PIN_R*2.2,p.y+PIN_R*2.2])}
+  renderText();renderRows();draw();
+}
+
+const cv=$("cv"),ctx=cv.getContext("2d");
+let W=0,H=0,DPR=1;const V={s:1,x:0,y:0};
+function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+let C={};
+function readColours(){C={bg:css("--map-bg"),water:css("--water"),outline:css("--outline"),label:css("--label"),halo:css("--halo"),
+  ink:css("--ink"),accent:css("--accent"),font:css("--font"),ramp:[css("--r0"),css("--r1"),css("--r2"),css("--r3"),css("--r4")]};renderLegend()}
+function resize(){const r=cv.getBoundingClientRect();DPR=Math.min(window.devicePixelRatio||1,2);W=r.width;H=r.height;cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);draw()}
+function fit(b){const pad=Math.min(48,W*.06),bw=Math.max(b[2]-b[0],1),bh=Math.max(b[3]-b[1],1);
+  V.s=Math.min((W-pad*2)/bw,(H-pad*2)/bh);V.x=(b[0]+b[2])/2-W/2/V.s;V.y=(b[1]+b[3])/2+H/2/V.s;draw()}
+const sx=x=>(x-V.x)*V.s, sy=y=>(V.y-y)*V.s, dx=X=>X/V.s+V.x, dy=Y=>V.y-Y/V.s;
+function level(h){const t=hTot[h];if(!t)return -1;const v=S.mode==="all"?hAll[h]/t:(S.k?hCnt[h]/t/S.k:0);
+  return v>=.999?4:v>=.75?3:v>=.5?2:v>=.25?1:0}
+function path(r){ctx.moveTo(sx(r[0]),sy(r[1]));for(let i=2;i<r.length;i+=2)ctx.lineTo(sx(r[i]),sy(r[i+1]));ctx.closePath()}
+function draw(){
+  if(!W)return;
+  ctx.setTransform(DPR,0,0,DPR,0,0);ctx.fillStyle=C.bg;ctx.fillRect(0,0,W,H);
+  ctx.fillStyle=C.water;ctx.beginPath();for(const r of DATA.water)path(r);ctx.fill("evenodd");
+  const x0=dx(0)-200,x1=dx(W)+200,y0=dy(H)-200,y1=dy(0)+200;
+  const groups=[[],[],[],[],[]];
+  for(let h=0;h<NH;h++){const cx=hc[2*h],cy=hc[2*h+1];if(cx<x0||cx>x1||cy<y0||cy>y1)continue;const l=level(h);if(l>=0)groups[l].push(h)}
+  const gap=V.s>0.5;
+  groups.forEach((hs,l)=>{if(!hs.length)return;ctx.fillStyle=C.ramp[l];ctx.beginPath();
+    for(const h of hs){const b=h*12;ctx.moveTo(sx(hv[b]),sy(hv[b+1]));for(let i=2;i<12;i+=2)ctx.lineTo(sx(hv[b+i]),sy(hv[b+i+1]));ctx.closePath()}
+    ctx.fill();if(gap){ctx.strokeStyle=C.bg;ctx.lineWidth=0.6;ctx.stroke()}});
+  ctx.lineJoin="round";ctx.strokeStyle=C.outline;ctx.lineWidth=0.8;ctx.beginPath();
+  for(const a of AREAS)for(const r of a.rings)path(r);ctx.stroke();
+  if(S.focus>=0){ctx.beginPath();for(const r of AREAS[S.focus].rings)path(r);ctx.strokeStyle=C.ink;ctx.lineWidth=2.4;ctx.stroke()}
+  for(const p of S.pins){const X=sx(p.x),Y=sy(p.y),R=PIN_R*V.s;ctx.beginPath();ctx.arc(X,Y,R,0,Math.PI*2);ctx.strokeStyle=C.accent;
+    ctx.lineWidth=S.focus===-p.id-2?3:2;ctx.setLineDash([6,4]);ctx.stroke();ctx.setLineDash([]);ctx.beginPath();ctx.arc(X,Y,4,0,Math.PI*2);ctx.fillStyle=C.accent;ctx.fill()}
+  drawLabels();
+}
+function drawLabels(){
+  const kmPerPx=DATA.unit/1000/V.s;
+  const minW=kmPerPx>0.09?1000:kmPerPx>0.045?60:kmPerPx>0.02?20:4;
+  ctx.textAlign="center";ctx.textBaseline="middle";ctx.lineJoin="round";
+  const boxes=[];let n=0;
+  for(const p of DATA.places){ if(p[3]<minW)break;
+    const X=sx(p[1]),Y=sy(p[2]);if(X<-50||X>W+50||Y<-20||Y>H+20)continue;
+    const big=p[3]>=1000;ctx.font=big?`700 13px ${C.font}`:`500 12px ${C.font}`;
+    const w=ctx.measureText(p[0]).width+10,h=18,b=[X-w/2,Y-h/2,X+w/2,Y+h/2];
+    if(boxes.some(o=>!(b[2]<o[0]||b[0]>o[2]||b[3]<o[1]||b[1]>o[3])))continue;boxes.push(b);
+    ctx.lineWidth=3.5;ctx.strokeStyle=C.halo;ctx.strokeText(p[0],X,Y);ctx.fillStyle=C.label;ctx.fillText(p[0],X,Y);
+    if(++n>60)break;
+  }
+}
+function renderLegend(){
+  if(!C.ramp)return;
+  const r=C.ramp.map(c=>`<i style="background:${c}"></i>`).join("");
+  const all=S.mode==="all";
+  $("legend").innerHTML=`<strong>${all?"Share of street length that reaches every selected need":"Share of the selected needs in reach"}</strong><div class="ramp">${r}</div><div class="ramp-lab"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>`;
+}
+
+const ptrs=new Map();let moved=0,pinchD=0;
+cv.addEventListener("pointerdown",e=>{cv.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,[e.offsetX,e.offsetY]);moved=0;
+  if(ptrs.size===1&&!S.placing)cv.classList.add("dragging");
+  if(ptrs.size===2){const [a,b]=[...ptrs.values()];pinchD=Math.hypot(a[0]-b[0],a[1]-b[1])}});
+cv.addEventListener("pointermove",e=>{
+  if(ptrs.has(e.pointerId)){const prev=ptrs.get(e.pointerId);ptrs.set(e.pointerId,[e.offsetX,e.offsetY]);
+    if(ptrs.size===2){const [a,b]=[...ptrs.values()];const d=Math.hypot(a[0]-b[0],a[1]-b[1]);if(pinchD)zoomAt((a[0]+b[0])/2,(a[1]+b[1])/2,d/pinchD);pinchD=d;moved+=10;hideTip();return}
+    const ddx=e.offsetX-prev[0],ddy=e.offsetY-prev[1];moved+=Math.abs(ddx)+Math.abs(ddy);
+    if(moved>4){V.x-=ddx/V.s;V.y+=ddy/V.s;draw();hideTip();return}}
+  if(e.pointerType==="mouse"&&!ptrs.size)showTip(e.offsetX,e.offsetY)});
+function endPtr(e){if(!ptrs.has(e.pointerId))return;ptrs.delete(e.pointerId);cv.classList.remove("dragging");
+  if(ptrs.size===0){if(moved<5&&e.type==="pointerup"){if(S.placing)addPin(dx(e.offsetX),dy(e.offsetY));else if(e.pointerType!=="mouse")showTip(e.offsetX,e.offsetY)}pinchD=0}}
+cv.addEventListener("pointerup",endPtr);cv.addEventListener("pointercancel",endPtr);
+cv.addEventListener("pointerleave",e=>{if(e.pointerType==="mouse")hideTip()});
+cv.addEventListener("wheel",e=>{e.preventDefault();zoomAt(e.offsetX,e.offsetY,Math.exp(-e.deltaY*0.0015))},{passive:false});
+cv.addEventListener("dblclick",e=>zoomAt(e.offsetX,e.offsetY,2));
+cv.addEventListener("keydown",e=>{const st=60/V.s;
+  if(e.key==="+"||e.key==="=")zoomAt(W/2,H/2,1.5);else if(e.key==="-")zoomAt(W/2,H/2,1/1.5);
+  else if(e.key==="ArrowLeft")V.x-=st;else if(e.key==="ArrowRight")V.x+=st;else if(e.key==="ArrowUp")V.y+=st;else if(e.key==="ArrowDown")V.y-=st;
+  else if(e.key==="Enter"&&S.placing)addPin(dx(W/2),dy(H/2));else if(e.key==="Escape"&&S.placing)togglePlacing(false);else return;
+  e.preventDefault();draw()});
+function zoomAt(X,Y,f){const ns=Math.max(0.004,Math.min(4,V.s*f));const mx=dx(X),my=dy(Y);V.s=ns;V.x=mx-X/ns;V.y=my+Y/ns;draw()}
+$("zin").onclick=()=>zoomAt(W/2,H/2,1.6);$("zout").onclick=()=>zoomAt(W/2,H/2,1/1.6);$("zfit").onclick=()=>setFocus(-1);
+
+function showTip(X,Y){
+  const h=nearestHex(dx(X),dy(Y)),tip=$("tip");if(h<0||!hTot[h]){hideTip();return}
+  const per=CATS.map(()=>[]);
+  for(const i of hSegs[h])for(let j=0;j<NC;j++)per[j].push(sDist[i*NC+j]);
+  const t=S.min*8;
+  const rows=CATS.map((c,j)=>{if(!S.on[j])return"";const a=per[j].sort((x,y)=>x-y),m=a[a.length>>1];
+    const txt=m===255?"over 2.5 km":nf.format(m*10)+" m";
+    return `<tr class="${m>t?"far":""}"><td>${esc(c.label)}</td><td>${txt}</td></tr>`}).join("");
+  const share=S.mode==="all"?`${Math.round(100*hAll[h]/hTot[h])}% of the street length here reaches every selected need.`:`${(hCnt[h]/hTot[h]).toFixed(1)} of ${S.k} needs in reach on average.`;
+  tip.innerHTML=`<h3>Near ${esc(nearestPlace(hc[2*h],hc[2*h+1]))}</h3><p style="margin:0 0 6px">${share}</p><table>${rows}</table><p style="margin:6px 0 0;color:var(--muted)">Typical walk to the nearest one, across ${nf.format(Math.round(hTot[h]))} m of street</p>`;
+  tip.style.display="block";
+  const tw=tip.offsetWidth,th=tip.offsetHeight;let L=X+16,T=Y+16;if(L+tw>W-8)L=X-tw-16;if(T+th>H-8)T=Y-th-16;
+  tip.style.left=Math.max(8,L)+"px";tip.style.top=Math.max(8,T)+"px";
+}
+function hideTip(){$("tip").style.display="none"}
+
+function togglePlacing(on){S.placing=on;const b=$("addpin");b.setAttribute("aria-pressed",String(on));b.textContent=on?"Cancel":"Add a place";
+  cv.classList.toggle("placing",on);$("pinhint").textContent=on?"Click the map where you want to measure. Keyboard: move with the arrows, then press Enter.":HINT;if(on)cv.focus()}
+function addPin(x,y){
+  const hexes=hexesNear(x,y,PIN_R);
+  if(!hexes.length){$("pinhint").textContent="No residential streets within 1 km of that spot. Try somewhere built up.";return}
+  const id=++pinSeq;S.pins.push({id,x,y,hexes,name:"Around "+nearestPlace(x,y)});
+  togglePlacing(false);S.focus=-id-2;update();
+}
+$("addpin").onclick=()=>togglePlacing(!S.placing);
+$("pinhint").textContent=HINT;
+
+const chips=$("chips");
+CATS.forEach((c,i)=>{const d=document.createElement("div");d.className="chip";
+  d.innerHTML=`<input type="checkbox" id="c${i}" checked><label for="c${i}">${esc(c.label)}</label>`;
+  d.querySelector("input").onchange=e=>{S.on[i]=e.target.checked;update()};chips.appendChild(d)});
+$("walk").oninput=e=>{S.min=+e.target.value;update()};
+function setMode(m){S.mode=m;$("m-all").setAttribute("aria-pressed",String(m==="all"));$("m-count").setAttribute("aria-pressed",String(m==="count"));renderLegend();update()}
+$("m-all").onclick=()=>setMode("all");$("m-count").onclick=()=>setMode("count");
+$("built").textContent=DATA.built;
+
+function update(){compute();renderText();renderRows();draw()}
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>{readColours();draw()});
+new MutationObserver(()=>{readColours();draw()}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>draw());
+readColours();compute();renderText();renderRows();
+let first=true;
+new ResizeObserver(()=>{resize();if(first){first=false;fit(full)}}).observe($("map"));
+})();
+</script>
+</body>
+</html>

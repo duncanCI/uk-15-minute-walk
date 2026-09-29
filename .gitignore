@@ -1,0 +1,7 @@
+# Downloaded source data and run outputs (rebuilt by the pipelines)
+cache/
+out/
+__pycache__/
+*.pyc
+.venv/
+.DS_Store
